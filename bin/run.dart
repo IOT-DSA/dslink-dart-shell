@@ -115,6 +115,26 @@ main(List<String> argv) async {
       print("Working Directory: ${cwd}");
     } else if (["q", "quit", "exit", "end", "finish", "done"].contains(cmd)) {
       exit(0);
+    } else if (["?", "help"].contains(cmd)) {
+      if (args.length == 0) {
+        print("Commands:");
+        for (var c in HELPS.keys) {
+          print("${c}: ${HELPS[c]}");
+        }
+      } else {
+        var cmds = ALIASES.keys.expand((x) => x).toList();
+        if (!cmds.contains(args[0])) {
+          print("Unknown Command: ${args[0]}");
+        } else {
+          var n = ALIASES.keys.firstWhere((x) => x.contains(args[0]));
+          var c = ALIASES[n];
+          if (!HELPS.containsKey(c)) {
+            print("No Help Found.");
+          } else {
+            print("${HELPS[c]}");
+          }
+        }
+      }
     } else if (["i", "invoke", "call"].contains(cmd)) {
       if (args.length == 0) {
         print("Usage: ${cmd} <path> [values]");
@@ -165,6 +185,27 @@ String interpretPath(String input) {
 
   return pathlib.normalize(input);
 }
+
+const Map<List<String>, String> ALIASES = const {
+  const ["ls", "l", "list"]: "ls",
+  const ["value", "val", "v"]: "value",
+  const ["set", "s"]: "set",
+  const ["cwd", "pwd"]: "pwd",
+  const ["i", "invoke", "call"]: "invoke",
+  const ["help", "?"]: "help",
+  const ["cd"]: "cd",
+  const ["q", "quit", "exit", "finsh", "done"]: "exit"
+};
+
+const Map<String, String> HELPS = const {
+  "ls": "List Configs, Attributes, and Children of Nodes",
+  "invoke": "Invoke an Action",
+  "set": "Set a Value",
+  "pwd": "Print the Working Directory",
+  "help": "Get Help",
+  "cd": "Change Working Directory",
+  "exit": "Exit the Tool"
+};
 
 String cwd = "/";
 
