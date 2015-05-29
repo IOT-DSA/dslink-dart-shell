@@ -4,8 +4,9 @@ import "dart:convert";
 
 import "package:dslink/dslink.dart";
 import "package:syscall/readline.dart";
-import "package:dslink/io.dart";
 import "package:dslink/worker.dart";
+
+import "package:path/path.dart" as pathlib;
 
 LinkProvider link;
 
@@ -27,8 +28,6 @@ main(List<String> argv) async {
 
   Requester requester = await link.onRequesterReady;
 
-  var input = readStdinLines().asBroadcastStream();
-
   while (true) {
     var line = await readline.callMethod("readline", "> ");
 
@@ -39,12 +38,11 @@ main(List<String> argv) async {
     var args = split.skip(1).toList();
 
     if (["list", "ls", "l"].contains(cmd)) {
-      if (args.length != 1) {
-        print("Usage: ${cmd} <path>");
-        continue;
+      if (args.length == 0) {
+        args = ["/"];
       }
 
-      var path = args[0];
+      var path = interpretPath(args[0]);
       RequesterListUpdate update = await requester.list(path).first;
 
       var node = update.node;
@@ -77,7 +75,7 @@ main(List<String> argv) async {
         continue;
       }
 
-      var path = args.join(" ");
+      var path = interpretPath(args.join(" "));
       var completer = new Completer<ValueUpdate>.sync();
       ReqSubscribeListener listener;
 
@@ -101,9 +99,20 @@ main(List<String> argv) async {
         continue;
       }
 
-      var path = args[0];
+      var path = interpretPath(args[0]);
       var value = parseInputValue(args.skip(1).join(" "));
       await requester.set(path, value);
+    } else if (["cd"].contains(cmd)) {
+      String path;
+      if (args.length == 0) {
+        path = "/";
+      } else {
+        path = args.join(" ");
+      }
+
+      cwd = interpretPath(path);
+    } else if (["cwd", "pwd"].contains(cmd)) {
+      print("Working Directory: ${cwd}");
     } else if (["q", "quit", "exit", "end", "finish", "done"].contains(cmd)) {
       exit(0);
     } else if (["i", "invoke", "call"].contains(cmd)) {
@@ -112,36 +121,52 @@ main(List<String> argv) async {
         continue;
       }
 
-      var path = args[0];
-      var value = args.length > 1 ? parseInputValue(args.skip(1).join(" ")) : {};
+      try {
+        var path = interpretPath(args[0]);
+        var value = args.length > 1 ? parseInputValue(args.skip(1).join(" ")) : {};
 
-      List<RequesterInvokeUpdate> updates = await requester.invoke(path, value).toList();
+        List<RequesterInvokeUpdate> updates = await requester.invoke(path, value).toList();
 
-      if (updates.length == 1 && updates.first.rows.length == 1) { // Single Row of Values
-        var update = updates.first;
-        var rows = update.rows;
-        var values = rows.first;
+        if (updates.length == 1 && updates.first.rows.length == 1) { // Single Row of Values
+          var update = updates.first;
+          var rows = update.rows;
+          var values = rows.first;
 
-        if (update.columns.isNotEmpty) {
-          var i = 0;
-          for (var x in update.columns) {
-            print("${x.name}: ${values[i]}");
-            i++;
+          if (update.columns.isNotEmpty) {
+            var i = 0;
+            for (var x in update.columns) {
+              print("${x.name}: ${values[i]}");
+              i++;
+            }
+          } else if (update.columns.isEmpty && values.isNotEmpty) {
+            print(values);
           }
-        } else if (update.columns.isEmpty && values.isNotEmpty) {
-          print(values);
+        } else {
+          var c = updates.last.columns;
+          var x = [];
+          for (var update in updates) {
+            x.addAll(update.updates);
+          }
+          print(buildTableTree(c, x));
         }
-      } else {
-        var c = updates.last.columns;
-        var x = [];
-        for (var update in updates) {
-          x.addAll(update.updates);
-        }
-        print(buildTableTree(c, x));
+      } catch (e) {
+        print(e);
       }
     }
   }
 }
+
+String interpretPath(String input) {
+  if (input.startsWith("/")) {
+    input = input.substring(1);
+  }
+
+  input = "${cwd}/${input}";
+
+  return pathlib.normalize(input);
+}
+
+String cwd = "/";
 
 String encodePrettyJson(input) => new JsonEncoder.withIndent("  ").convert(input);
 
