@@ -12,7 +12,14 @@ LinkProvider link;
 
 readlineWorker(Worker worker) async {
   await worker.init(methods: {
-    "readline": (String prompt) => Readline.readLine(prompt, addToHistory: true)
+    "readline": (String prompt) {
+      if (Platform.isWindows) {
+        stdout.write("> ");
+        return stdin.readLineSync();
+      } else {
+        return Readline.readLine(prompt, addToHistory: true);
+      }
+    }
   });
 }
 
