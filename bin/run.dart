@@ -17,7 +17,12 @@ readlineWorker(Worker worker) async {
         stdout.write("> ");
         return stdin.readLineSync();
       } else {
-        return Readline.readLine(prompt, addToHistory: true);
+        try {
+          return Readline.readLine(prompt, addToHistory: true);
+        } catch (e) {
+          stdout.write("> ");
+          return stdin.readLineSync();
+        }
       }
     }
   });
