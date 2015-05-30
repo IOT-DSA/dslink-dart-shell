@@ -256,8 +256,21 @@ dynamic parseInputValue(String input) {
     return JSON.decode(input);
   } catch (e) {}
 
+  if (KEY_VALUE_PAIRS.hasMatch(input)) {
+    var m = {};
+    var matches = KEY_VALUE_PAIRS.allMatches(input);
+
+    for (var match in matches) {
+      m[match.group(1)] = parseInputValue(match.group(2));
+    }
+
+    return m;
+  }
+
   return input;
 }
+
+RegExp KEY_VALUE_PAIRS = new RegExp(r'([A-Za-z]+)=(?:\"(.+)\"|([^\s]+))');
 
 class Icon {
   static const String CHECKMARK = "\u2713";
