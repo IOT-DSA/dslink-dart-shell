@@ -53,7 +53,7 @@ main(List<String> argv) async {
   await readline.init();
 
   link = new LinkProvider(argv, "Shell-", isRequester: true, isResponder: false, defaultLogLevel: "OFF");
-  link.connect();
+  await link.connect();
 
   Requester requester = await link.onRequesterReady;
 
