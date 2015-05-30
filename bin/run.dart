@@ -5,6 +5,7 @@ import "dart:convert";
 import "package:dslink/dslink.dart";
 import "package:syscall/readline.dart" deferred as Readline;
 import "package:dslink/worker.dart";
+import "package:console/console.dart";
 
 import "package:path/path.dart" as pathlib;
 
@@ -196,7 +197,7 @@ main(List<String> argv) async {
           for (var update in updates) {
             x.addAll(update.updates);
           }
-          print(buildTableTree(c, x));
+          stdout.write(buildTableTree(c, x));
         }
       } catch (e) {
         print(e);
@@ -261,7 +262,7 @@ dynamic parseInputValue(String input) {
     var matches = KEY_VALUE_PAIRS.allMatches(input);
 
     for (var match in matches) {
-      m[match.group(1)] = parseInputValue(match.group(2));
+      m[match.group(1)] = parseInputValue(match.group(3));
     }
 
     return m;
@@ -325,31 +326,5 @@ String buildTableTree(List<TableColumn> columns, List<List<dynamic>> rows) {
     i++;
   }
 
-  return createTreeView(map);
+  return createTree(map);
 }
-
-String createTreeView(input, {String prefix: '', Map opts}) {
-  if (input is String) {
-    input = {
-      "label": input
-    };
-  }
-
-  var label = input.containsKey("label") ? input['label'] : "";
-  var nodes = input.containsKey("nodes") ? input['nodes'] : [];
-
-  var lines = label.split("\n");
-  var splitter = '\n' + prefix + (nodes.isNotEmpty ? Icon.PIPE_VERTICAL : ' ') + ' ';
-
-  return prefix + lines.join(splitter) + '\n' + nodes.map((node) {
-    var last = nodes.last == node;
-    var more = node is Map && node.containsKey("nodes") && node['nodes'] is List && node['nodes'].isNotEmpty;
-    var prefix_ = prefix + (last ? ' ' : Icon.PIPE_VERTICAL) + ' ';
-
-    return prefix
-    + (last ? Icon.PIPE_LEFT_HALF_VERTICAL : Icon.PIPE_LEFT_VERTICAL) + Icon.PIPE_HORIZONTAL
-    + (more ? Icon.PIPE_BOTH : Icon.PIPE_HORIZONTAL) + ' '
-    + createTreeView(node, prefix: prefix_, opts: opts).substring(prefix.length + 2);
-  }).join('');
-}
-

@@ -5,5 +5,7 @@ dependencies:
     git: https://github.com/IOT-DSA/sdk-dslink-dart.git
   syscall:
     git: https://github.com/DirectMyFile/syscall.git
+  console:
+    git: https://github.com/DirectMyFile/console.dart.git
 executables:
   dsash: run
