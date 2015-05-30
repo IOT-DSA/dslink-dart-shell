@@ -29,8 +29,23 @@ readlineWorker(Worker worker) async {
 }
 
 WorkerSocket readline = createWorker(readlineWorker);
+Directory shellDir;
 
 main(List<String> argv) async {
+  var home = Platform.environment["HOME"];
+  if (home == null) {
+    home = Platform.isWindows ? "C:\\" : "/";
+  }
+  var dir = new Directory(pathlib.join(home, ".dsash"));
+
+  if (!(await dir.exists())) {
+    await dir.create(recursive: true);
+  }
+
+  shellDir = dir;
+
+  Directory.current = shellDir;
+
   updateLogLevel("OFF");
 
   await readline.init();
