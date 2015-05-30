@@ -3,7 +3,7 @@ import "dart:io";
 import "dart:convert";
 
 import "package:dslink/dslink.dart";
-import "package:syscall/readline.dart";
+import "package:syscall/readline.dart" deferred as Readline;
 import "package:dslink/worker.dart";
 
 import "package:path/path.dart" as pathlib;
@@ -12,13 +12,15 @@ LinkProvider link;
 
 readlineWorker(Worker worker) async {
   await worker.init(methods: {
-    "readline": (String prompt) {
+    "readline": (String prompt) async {
+      await Readline.loadLibrary();
+
       if (Platform.isWindows) {
         stdout.write("> ");
         return stdin.readLineSync();
       } else {
         try {
-          return Readline.readLine(prompt, addToHistory: true);
+          return Readline.Readline.readLine(prompt, addToHistory: true);
         } catch (e) {
           stdout.write("> ");
           return stdin.readLineSync();
