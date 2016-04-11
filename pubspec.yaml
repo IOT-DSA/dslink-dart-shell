@@ -2,7 +2,8 @@ name: dslink_shell
 description: DSLink Shell Requester
 dependencies:
   dslink:
-    git: https://github.com/IOT-DSA/sdk-dslink-dart.git
+    git:
+      url: https://github.com/IOT-DSA/sdk-dslink-dart.git
   syscall:
     git: https://github.com/DirectMyFile/syscall.git
   console:

@@ -3,35 +3,13 @@ import "dart:io";
 import "dart:convert";
 
 import "package:dslink/dslink.dart";
-import "package:syscall/readline.dart" deferred as Readline;
-import "package:dslink/worker.dart";
+import "package:dslink/io.dart";
+
 import "package:console/console.dart";
 
 import "package:path/path.dart" as pathlib;
 
 LinkProvider link;
-
-readlineWorker(Worker worker) async {
-  await worker.init(methods: {
-    "readline": (String prompt) async {
-      await Readline.loadLibrary();
-
-      if (Platform.isWindows) {
-        stdout.write("> ");
-        return stdin.readLineSync();
-      } else {
-        try {
-          return Readline.Readline.readLine(prompt, addToHistory: true);
-        } catch (e) {
-          stdout.write("> ");
-          return stdin.readLineSync();
-        }
-      }
-    }
-  });
-}
-
-WorkerSocket readline = createWorker(readlineWorker);
 Directory shellDir;
 
 main(List<String> argv) async {
@@ -51,17 +29,26 @@ main(List<String> argv) async {
 
   updateLogLevel("OFF");
 
-  await readline.init();
+  link = new LinkProvider(
+    argv,
+    "Shell-",
+    isRequester: true,
+    isResponder: false,
+    defaultLogLevel: "WARNING"
+  );
 
-  link = new LinkProvider(argv, "Shell-", isRequester: true, isResponder: false, defaultLogLevel: "OFF");
   await link.connect();
 
   Requester requester = await link.onRequesterReady;
 
-  while (true) {
-    var line = await readline.callMethod("readline", "> ");
+  Stream<String> input = readStdinLines();
 
-    if (line.trim().isEmpty) continue;
+  stdout.write("> ");
+  await for (String line in input) {
+    if (line.trim().isEmpty) {
+      stdout.write("> ");
+      continue;
+    }
     var split = line.split(" ");
 
     var cmd = split[0];
@@ -73,10 +60,10 @@ main(List<String> argv) async {
       }
 
       var path = interpretPath(args[0]);
-      RequesterListUpdate update = await requester.list(path).first;
-
-      var node = update.node;
-      var name = node.configs.containsKey(r"$name") ? node.configs[r"$name"] : node.name;
+      var node = await requester.getRemoteNode(path);
+      var name = node.configs.containsKey(r"$name") ?
+        node.configs[r"$name"] :
+        node.name;
 
       print("Name: ${name}");
       print("Configs:");
@@ -95,13 +82,15 @@ main(List<String> argv) async {
         print("Children:");
         for (var id in node.children.keys) {
           RemoteNode child = node.getChild(id);
-          var cn = child.configs.containsKey(r"$name") ? child.configs[r"$name"] : child.name;
+          var cn = child.configs.containsKey(r"$name") ?
+            child.configs[r"$name"] : child.name;
           print("  - ${cn}${cn != child.name ? ' (${child.name})' : ''}");
         }
       }
     } else if (["value", "val", "v"].contains(cmd)) {
       if (args.length == 0) {
         print("Usage: ${cmd} <path>");
+        stdout.write("> ");
         continue;
       }
 
@@ -115,7 +104,8 @@ main(List<String> argv) async {
       });
 
       try {
-        ValueUpdate update = await completer.future.timeout(new Duration(seconds: 5), onTimeout: () {
+        ValueUpdate update = await completer.future.timeout(
+          const Duration(seconds: 5), onTimeout: () {
           listener.cancel();
           throw new Exception("ERROR: Timed out while attempting to get the value.");
         });
@@ -126,6 +116,7 @@ main(List<String> argv) async {
     } else if (["set", "s"].contains(cmd)) {
       if (args.length < 2) {
         print("Usage: ${cmd} <path> <value>");
+        stdout.write("> ");
         continue;
       }
 
@@ -168,6 +159,7 @@ main(List<String> argv) async {
     } else if (["i", "invoke", "call"].contains(cmd)) {
       if (args.length == 0) {
         print("Usage: ${cmd} <path> [values]");
+        stdout.write("> ");
         continue;
       }
 
@@ -175,7 +167,10 @@ main(List<String> argv) async {
         var path = interpretPath(args[0]);
         var value = args.length > 1 ? parseInputValue(args.skip(1).join(" ")) : {};
 
-        List<RequesterInvokeUpdate> updates = await requester.invoke(path, value).toList();
+        List<RequesterInvokeUpdate> updates = await requester.invoke(
+          path,
+          value
+        ).toList();
 
         if (updates.length == 1 && updates.first.rows.length == 1) { // Single Row of Values
           var update = updates.first;
@@ -195,14 +190,19 @@ main(List<String> argv) async {
           var c = updates.last.columns;
           var x = [];
           for (var update in updates) {
-            x.addAll(update.updates);
+            if (update.updates != null) {
+              x.addAll(update.updates);
+            }
           }
           stdout.write(buildTableTree(c, x));
         }
-      } catch (e) {
+      } catch (e, stack) {
         print(e);
+        print(stack);
       }
     }
+
+    stdout.write("> ");
   }
 }
 
@@ -239,7 +239,8 @@ const Map<String, String> HELPS = const {
 
 String cwd = "/";
 
-String encodePrettyJson(input) => new JsonEncoder.withIndent("  ").convert(input);
+String encodePrettyJson(input) => const JsonEncoder.withIndent("  ")
+  .convert(input);
 
 dynamic parseInputValue(String input) {
   var number = num.parse(input, (_) => null);
@@ -304,19 +305,29 @@ String buildTableTree(List<TableColumn> columns, List<List<dynamic>> rows) {
     var n = [];
 
     var x = 0;
-    for (var value in row) {
-      String name;
-      if (x >= columns.length) {
-        name = "";
-      } else {
-        name = columns[x].name;
-      }
 
-      n.add({
-        "label": name,
-        "nodes": [value.toString()]
-      });
-      x++;
+    if (row is List) {
+      for (var value in row) {
+        String name;
+        if (x >= columns.length) {
+          name = "";
+        } else {
+          name = columns[x].name;
+        }
+
+        n.add({
+          "label": name,
+          "nodes": [value.toString()]
+        });
+        x++;
+      }
+    } else if (row is Map) {
+      for (var name in row.keys) {
+        n.add({
+          "label": name,
+          "nodes": [row[name].toString()]
+        });
+      }
     }
 
     nodes.add({
