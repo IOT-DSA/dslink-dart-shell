@@ -8,7 +8,7 @@ A Command Line Shell for DSA
 $ curl https://raw.githubusercontent.com/IOT-DSA/dslink-dart-shell/HEAD/tool/install.sh | bash
 ```
 
-Make sure `${HOME}/bin` is on your PATH.
+Make sure `${HOME}/bin` is on your PATH, and that [Dart](https://www.dartlang.org/downloads/) is installed.
 
 ## Usage
 
