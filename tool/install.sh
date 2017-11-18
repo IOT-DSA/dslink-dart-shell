@@ -18,8 +18,8 @@ popd > /dev/null
 mkdir -p "${HOME}/bin"
 cat > "${HOME}/bin/dsash" <<EOF
 #!/usr/bin/env bash
-dart ${HOME}/.dsash/shell/bin/run.dart ${@}
-exit ${?}
+dart $HOME/.dsash/shell/bin/run.dart \$@
+exit \$?
 EOF
 chmod +x "${HOME}/bin/dsash"
 echo "Success!"
